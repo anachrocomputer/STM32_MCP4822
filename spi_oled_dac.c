@@ -324,6 +324,20 @@ static void dac_a(const int dac)
 }
 
 
+/* dac_b --- set DAC B output register */
+
+static void dac_b(const int dac)
+{
+   const uint16_t w = 0xb000 | (dac & 0x0fff);
+   
+   dac_cs(0);
+   
+   dac_txd(w);
+   
+   dac_cs(1);
+}
+
+
 /* oledCmd --- send a command byte to the OLED by SPI */
 
 static void oledCmd(const uint8_t c)
@@ -1395,6 +1409,7 @@ int main(void)
    
    OLED_begin(MAXX, MAXY);
    dac_a(0);
+   dac_b(0);
    
    greyFrame();
     
@@ -1559,6 +1574,7 @@ int main(void)
             break;
          case '<':
             dac_a(32);  // 0.016V
+            dac_b(0);
             break;
          case '=':
             printf("DAC WRITE %d\n", 32 + (12 * 32));
@@ -1569,6 +1585,7 @@ int main(void)
             break;
          case '>':
             dac_a(4000);   // 2.00V Fluke 8060A has a 2V range
+            dac_b(4095);
             break;
          case '.':
             drawSegDP(x, style, colour);

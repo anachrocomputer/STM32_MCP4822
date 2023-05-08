@@ -296,7 +296,7 @@ static uint8_t spi_txd(const uint8_t data)
 
 /* dac_txd --- transmit data to MCP4822 DAC via SPI2 */
 
-static uint8_t dac_txd(const uint8_t data)
+static uint16_t dac_txd(const uint16_t data)
 {
    SPI2->DR = data;
    
@@ -314,13 +314,11 @@ static uint8_t dac_txd(const uint8_t data)
 
 static void dac_a(const int dac)
 {
-   const uint8_t b1 = 0x30 | ((dac >> 8) & 0x0f);
-   const uint8_t b2 = dac & 0xff;
+   const uint16_t w = 0x3000 | (dac & 0x0fff);
    
    dac_cs(0);
    
-   dac_txd(b1);
-   dac_txd(b2);
+   dac_txd(w);
    
    dac_cs(1);
 }
@@ -1322,6 +1320,7 @@ static void initSPI2(void)
    SPI2->CR1 = 0;
    SPI2->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_MSTR;
    SPI2->CR1 |= SPI_CR1_CPOL | SPI_CR1_CPHA;
+   SPI2->CR1 |= SPI_CR1_DFF;  // 16-bit mode for just a bit more speed
    SPI2->CR1 |= SPI_CR1_BR_1; // 100MHz divide-by-8 gives 12.5MHz
    SPI2->CR1 |= SPI_CR1_SPE;  // Enable SPI
    

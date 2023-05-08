@@ -310,15 +310,21 @@ static uint8_t dac_txd(const uint8_t data)
 }
 
 
+/* dac_a --- set DAC A output register */
+
 static void dac_a(const int dac)
 {
+   const uint8_t b1 = 0x30 | ((dac >> 8) & 0x0f);
+   const uint8_t b2 = dac & 0xff;
+   
    dac_cs(0);
    
-   dac_txd(0);
-   dac_txd(0);
+   dac_txd(b1);
+   dac_txd(b2);
    
    dac_cs(1);
 }
+
 
 /* oledCmd --- send a command byte to the OLED by SPI */
 
@@ -1295,19 +1301,19 @@ static void initSPI2(void)
    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;                   // Enable clock to GPIO B peripherals on AHB1 bus
    
    // Configure PB10, the GPIO pin with alternative function SCK2
-   GPIOB->MODER |= GPIO_MODER_MODER5_1;        // PA5 in Alternative Function mode
-   GPIOB->AFR[0] |= 5 << 20;                   // Configure PA5 as alternate function, AF5, SCK2
+   GPIOB->MODER |= GPIO_MODER_MODER10_1;       // PB10 in Alternative Function mode
+   GPIOB->AFR[1] |= 5 << 8;                    // Configure PB10 as alternate function, AF5, SCK2
    
    // Configure PB14, the GPIO pin with alternative function MISO2
    //GPIOB->MODER |= GPIO_MODER_MODER6_1;        // PB14 in Alternative Function mode
    //GPIOB->AFR[0] |= 5 << 24;                   // Configure PB14 as alternate function, AF5, MISO2
    
    // Configure PB15, the GPIO pin with alternative function MOSI2
-   GPIOB->MODER |= GPIO_MODER_MODER7_1;        // PB15 in Alternative Function mode
-   GPIOB->AFR[0] |= 5 << 28;                   // Configure PB15 as alternate function, AF5, MOSI2
+   GPIOB->MODER |= GPIO_MODER_MODER15_1;       // PB15 in Alternative Function mode
+   GPIOB->AFR[1] |= 5 << 28;                   // Configure PB15 as alternate function, AF5, MOSI2
    
    // Configure PA8, the GPIO pin with function CS
-   GPIOA->MODER |= GPIO_MODER_MODER8_0;      // Configure PA8 as output for DAC CS
+   GPIOA->MODER |= GPIO_MODER_MODER8_0;        // Configure PA8 as output for DAC CS
    
    // Configure Pxx, the GPIO pin with function LDAC
    //GPIOx->MODER |= GPIO_MODER_MODERx_0;      // Configure Pxx as output for LDAC
@@ -1551,6 +1557,19 @@ int main(void)
             break;
          case '/':
             printf("analogRead = %d, %d\n", analogRead(1), analogRead(8));
+            break;
+         case '<':
+            dac_a(32);  // 0.016V
+            break;
+         case '=':
+            printf("DAC WRITE %d\n", 32 + (12 * 32));
+            dac_a(32 + (12 * 32));  // 0.208V
+            break;
+         case '+':
+            dac_a(2000);   // 1.00V because Data Precision 3500's 1V range only goes to 1.2V
+            break;
+         case '>':
+            dac_a(4000);   // 2.00V Fluke 8060A has a 2V range
             break;
          case '.':
             drawSegDP(x, style, colour);

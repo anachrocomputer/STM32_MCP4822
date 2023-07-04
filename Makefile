@@ -40,7 +40,7 @@ OCFLAGS=-R .stack -O binary
 SZFLAGS=-B -d
 INFOFLAGS=--descr
 
-OBJS=spi_oled_dac.o
+OBJS=spi_oled_dac.o ArmDds.o
 ELFS=$(OBJS:.o=.elf)
 BINS=$(OBJS:.o=.bin)
 
@@ -54,9 +54,19 @@ spi_oled_dac.bin: spi_oled_dac.elf
 spi_oled_dac.elf: spi_oled_dac.o startup_stm32f411xe.o system_stm32f4xx.o
 	$(LD) -mcpu=$(MCU) $(LDFLAGS) startup_stm32f411xe.o system_stm32f4xx.o spi_oled_dac.o
 	$(SZ) $(SZFLAGS) spi_oled_dac.elf
-	
+
 spi_oled_dac.o: spi_oled_dac.c
 	$(CC) -mcpu=$(MCU) $(CFLAGS) spi_oled_dac.c
+
+ArmDds.bin: ArmDds.elf
+	$(OC) $(OCFLAGS) ArmDds.elf ArmDds.bin
+
+ArmDds.elf: ArmDds.o startup_stm32f411xe.o system_stm32f4xx.o
+	$(LD) -mcpu=$(MCU) $(LDFLAGS) startup_stm32f411xe.o system_stm32f4xx.o ArmDds.o
+	$(SZ) $(SZFLAGS) ArmDds.elf
+
+ArmDds.o: ArmDds.c
+	$(CC) -mcpu=$(MCU) $(CFLAGS) ArmDds.c
 
 system_stm32f4xx.o: $(SYSTEM)
 	$(CC) -mcpu=$(MCU) $(CFLAGS) $(SYSTEM)
@@ -68,7 +78,10 @@ startup_stm32f411xe.o: $(STARTUP)
 prog: spi_oled_dac.bin
 	$(STFLASH) write spi_oled_dac.bin 0x8000000
 
-.PHONY: prog
+progdds: ArmDds.bin
+	$(STFLASH) write ArmDds.bin 0x8000000
+
+.PHONY: prog progdds
 
 # Target 'teststlink' will connect to the programmer and read the
 # device ID, but not program it

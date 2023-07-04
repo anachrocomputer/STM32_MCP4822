@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 // Size of 128x128 OLED screen
 #define MAXX 128
@@ -134,7 +135,13 @@ uint16_t Frame[MAXY][MAXX];
 
 volatile uint32_t Milliseconds = 0;
 volatile uint8_t Tick = 0;
-static void dac_a(const int dac);
+volatile uint16_t PhaseAcc = 0u;
+volatile uint16_t PhaseInc = 512u;
+volatile uint16_t Wave[256];
+uint16_t IncTab[128];
+const char NoteNames[12][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+int __errno;   // Needed by 'pow()' from math.h
 
 /* USART1_IRQHandler --- ISR for USART1, used for Rx and Tx */
 
@@ -176,9 +183,27 @@ void USART1_IRQHandler(void)
 
 void TIM4_IRQHandler(void)
 {
+   volatile uint16_t junk __attribute((unused));
+   
    TIM4->SR &= ~TIM_SR_UIF;   // Clear timer interrupt flag
    
-   dac_a(2048);
+   PhaseAcc += PhaseInc;
+   const uint16_t sample = Wave[PhaseAcc >> 8u];
+   const uint16_t dac = 0x3000 | (sample & 0x0fff);
+   
+   GPIOA->BSRR = GPIO_BSRR_BR8; // GPIO pin PA8 LOW
+   
+   SPI2->DR = dac;
+   
+   while ((SPI2->SR & SPI_SR_TXE) == 0)
+      ;
+      
+   while ((SPI2->SR & SPI_SR_RXNE) == 0)
+      ;
+      
+   junk = SPI2->DR;
+   
+   GPIOA->BSRR = GPIO_BSRR_BS8; // GPIO pin PA8 HIGH
 }
 
 
@@ -1372,6 +1397,15 @@ int main(void)
    int x = digit * width;
    int style = VFD_STYLE;           // Initially draw digits in Vacuum Fluorescent Display style
    uint16_t colour = VFD_COLOUR;    // Initially draw in cyan
+   uint16_t adc1 = 0u;
+   uint16_t adc8 = 0u;
+   uint8_t state = 0u;
+   uint8_t midi = 0u;
+   uint8_t note = 0u;
+   uint8_t octave = 0u;
+   const char *name = NULL;
+   int i;
+   const double delta = (2.0 * M_PI) / 256.0;
    
    initMCU();
    initGPIOs();
@@ -1382,11 +1416,12 @@ int main(void)
    initTimers();
    initMillisecondTimer();
    
+   dac_a(0);
+   dac_b(0);
+   
    __enable_irq();   // Enable all interrupts
    
    OLED_begin(MAXX, MAXY);
-   dac_a(0);
-   dac_b(0);
    
    greyFrame();
     
@@ -1394,11 +1429,46 @@ int main(void)
    
    printf("\nHello from the STM%dF%d\n", 32, 411);
    
+   // Generate sinewave
+   for (i = 0; i < 256; i++) {
+      const double theta = delta * (double)i;
+      Wave[i] = (sin(theta) * 2047) + 2048;
+   }
+   
+   // Generate table of phase increments
+   for (i = 0; i < 128; i++) {
+      const double frequency = 440.0 * pow(2.0, (double)(i - 69) / 12.0);
+      
+      IncTab[i] = ((frequency * 65536.0) / 40000.0) + 0.5;
+   }
+   
    end = millis() + 500u;
    frame = millis() + 40u;
    
    while (1) {
       if (Tick) {
+         switch (state) {
+         case 0:
+            adc1 = analogRead(1);
+            state++;
+            break;
+         case 1:
+            adc8 = analogRead(8);
+            state++;
+            break;
+         case 2:
+            midi = adc1 / 32;
+            octave = (midi / 12) - 1;
+            note = midi % 12;
+            name = NoteNames[note];
+            state++;
+            break;
+         case 3:
+            PhaseInc = IncTab[midi];
+            state = 0;
+            break;
+         }
+         
          if (millis() >= end) {
             end = millis() + 500u;
             
@@ -1411,7 +1481,7 @@ int main(void)
             
             flag = !flag;
             
-            printf("millis() = %ld\n", millis());
+            printf("millis() = %ld %d %d %s%d\n", millis(), adc8, midi, name, octave);
          }
          
          if (millis() >= frame) {
@@ -1544,21 +1614,6 @@ int main(void)
             break;
          case '/':
             printf("analogRead = %d, %d\n", analogRead(1), analogRead(8));
-            break;
-         case '<':
-            dac_a(32);  // 0.016V
-            dac_b(0);
-            break;
-         case '=':
-            printf("DAC WRITE %d\n", 32 + (12 * 32));
-            dac_a(32 + (12 * 32));  // 0.208V
-            break;
-         case '+':
-            dac_a(2000);   // 1.00V because Data Precision 3500's 1V range only goes to 1.2V
-            break;
-         case '>':
-            dac_a(4000);   // 2.00V Fluke 8060A has a 2V range
-            dac_b(4095);
             break;
          case '.':
             drawSegDP(x, style, colour);

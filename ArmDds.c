@@ -1429,7 +1429,7 @@ int main(void)
    
    printf("\nHello from the STM%dF%d\n", 32, 411);
    
-   // Generate sinewave
+   // Generate 12-bit sinewave
    for (i = 0; i < 256; i++) {
       const double theta = delta * (double)i;
       Wave[i] = (sin(theta) * 2047) + 2048;

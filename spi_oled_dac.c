@@ -1308,7 +1308,7 @@ static void initSPI(void)
 static void initSPI2(void)
 {
    // Configure Reset and Clock Control
-   RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;                    // Enable clock to SPI2 peripheral on APB1 bus
+   RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;                    // Enable clock to SPI2 peripheral on APB1 bus (50MHz)
    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;                   // Enable clock to GPIO A peripherals on AHB1 bus
    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;                   // Enable clock to GPIO B peripherals on AHB1 bus
    
@@ -1332,10 +1332,11 @@ static void initSPI2(void)
    
    // Set up SPI2
    SPI2->CR1 = 0;
+   SPI2->CR2 = 0;
    SPI2->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_MSTR;
    SPI2->CR1 |= SPI_CR1_CPOL | SPI_CR1_CPHA;
    SPI2->CR1 |= SPI_CR1_DFF;  // 16-bit mode for just a bit more speed
-   SPI2->CR1 |= SPI_CR1_BR_1; // 100MHz divide-by-8 gives 12.5MHz
+   SPI2->CR1 |= SPI_CR1_BR_1; // 50MHz divide-by-8 gives 6.25MHz
    SPI2->CR1 |= SPI_CR1_SPE;  // Enable SPI
    
    dac_cs(1);

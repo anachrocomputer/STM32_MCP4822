@@ -1520,16 +1520,6 @@ int main(void)
             setRect(0, 0, MAXX - 1, MAXY - 1, SSD1351_WHITE);
             updscreen(0, MAXY - 1);
             break;
-         case 'q':
-         case 'Q':
-            setVline(MAXX / 4,       0, MAXY - 1, SSD1351_WHITE);
-            setVline(MAXX / 2,       0, MAXY - 1, SSD1351_WHITE);
-            setVline((MAXX * 3) / 4, 0, MAXY - 1, SSD1351_WHITE);
-            setHline(0, MAXX - 1, MAXY / 4, SSD1351_WHITE);
-            setHline(0, MAXX - 1, MAXY / 2, SSD1351_WHITE);
-            setHline(0, MAXX - 1, (MAXY * 3) / 4, SSD1351_WHITE);
-            updscreen(0, MAXY - 1);
-            break;
          case 'g':
             digit = 0;
             x = digit * width;
@@ -1640,10 +1630,38 @@ int main(void)
             style = VFD_STYLE;
             colour = VFD_COLOUR;
             break;
-         case 'w':
+         case 'w':   // Sawtooth
          case 'W':
+            for (i = 0; i < 256; i++)
+               Wave[i] = i * 16;
+            
             style = LED_DOT_STYLE;
             colour = LED_COLOUR;
+            break;
+         case 's':   // Sine
+         case 'S':
+            for (i = 0; i < 256; i++) {
+               const double theta = delta * (double)i;
+               Wave[i] = (sin(theta) * 2047) + 2048;
+            }
+            break;
+         case 't':   // Triangle
+         case 'T':
+            for (i = 0; i < 256; i++) {
+               if (i < 128)
+                  Wave[i] = i * 32;
+               else
+                  Wave[i] = (255 - i) * 32;
+            }
+            break;
+         case 'q':   // Square
+         case 'Q':
+            for (i = 0; i < 256; i++) {
+               if (i < 128)
+                  Wave[i] = 4095;
+               else
+                  Wave[i] = 0;
+            }
             break;
          case 'x':
          case 'X':

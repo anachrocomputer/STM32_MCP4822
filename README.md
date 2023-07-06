@@ -69,9 +69,9 @@ The ATtiny1616 and ATmega4809 also accept 'i' to print the chip ID
 bytes, 'n' to print the unique serial number and 'f' to print the
 values of the fuse registers. --->
 
-<!--- To select different waveforms, the chips accept 's' for a sinewave,
+To select different waveforms, the chips accept 's' for a sinewave,
 'q' for a squarewave, 't' for a triangle wave, and 'w' for a sawtooth.
-This may change to become voltage-controlled in a future version. --->
+This may change to become voltage-controlled in a future version.
 
 ## Future Enhancements
 

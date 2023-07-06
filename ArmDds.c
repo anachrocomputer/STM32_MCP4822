@@ -179,6 +179,18 @@ void USART1_IRQHandler(void)
 }
 
 
+/* SPI2_IRQHandler --- ISR for SPI2, used at completion of DAC SPI transaction */
+
+void SPI2_IRQHandler(void)
+{
+   volatile uint16_t junk __attribute((unused));
+   
+   junk = SPI2->DR;
+   
+   GPIOA->BSRR = GPIO_BSRR_BS8; // GPIO pin PA8 HIGH: DAC chip de-select
+}
+
+
 /* TIM4_IRQHandler --- ISR for TIM4, used for sample generation at 40kHz */
 
 void TIM4_IRQHandler(void)
@@ -191,19 +203,9 @@ void TIM4_IRQHandler(void)
    const uint16_t sample = Wave[PhaseAcc >> 8u];
    const uint16_t dac = 0x3000 | (sample & 0x0fff);
    
-   GPIOA->BSRR = GPIO_BSRR_BR8; // GPIO pin PA8 LOW
+   GPIOA->BSRR = GPIO_BSRR_BR8; // GPIO pin PA8 LOW: DAC chip select
    
-   SPI2->DR = dac;
-   
-   while ((SPI2->SR & SPI_SR_TXE) == 0)
-      ;
-      
-   while ((SPI2->SR & SPI_SR_RXNE) == 0)
-      ;
-      
-   junk = SPI2->DR;
-   
-   GPIOA->BSRR = GPIO_BSRR_BS8; // GPIO pin PA8 HIGH
+   SPI2->DR = dac;   // Start SPI transmission to DAC
 }
 
 
@@ -1334,11 +1336,15 @@ static void initSPI2(void)
    
    // Set up SPI2
    SPI2->CR1 = 0;
+   SPI2->CR2 = 0;
    SPI2->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_MSTR;
    SPI2->CR1 |= SPI_CR1_CPOL | SPI_CR1_CPHA;
    SPI2->CR1 |= SPI_CR1_DFF;  // 16-bit mode for just a bit more speed
-   SPI2->CR1 |= SPI_CR1_BR_1; // 100MHz divide-by-8 gives 12.5MHz
+   SPI2->CR1 |= SPI_CR1_BR_2; // 100MHz divide-by-32 gives 1.5625MHz
+   SPI2->CR2 |= SPI_CR2_RXNEIE;  // Enable interrupt on Rx non-empty
    SPI2->CR1 |= SPI_CR1_SPE;  // Enable SPI
+   
+   NVIC_EnableIRQ(SPI2_IRQn);
    
    dac_cs(1);
 }

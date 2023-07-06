@@ -203,6 +203,12 @@ void TIM4_IRQHandler(void)
    const uint16_t sample = Wave[PhaseAcc >> 8u];
    const uint16_t dac = 0x3000 | (sample & 0x0fff);
    
+   // Square wave on PB12 for scope sync
+   if (PhaseAcc & 0x8000)
+      GPIOB->BSRR = GPIO_BSRR_BR12; // GPIO pin PB12 LOW
+   else
+      GPIOB->BSRR = GPIO_BSRR_BS12; // GPIO pin PB12 HIGH
+   
    GPIOA->BSRR = GPIO_BSRR_BR8; // GPIO pin PA8 LOW: DAC chip select
    
    SPI2->DR = dac;   // Start SPI transmission to DAC
@@ -1196,8 +1202,8 @@ static void initGPIOs(void)
    // Configure PA0, the GPIO pin with the button
    GPIOA->PUPDR |= GPIO_PUPDR_PUPD0_0;       // Enable pull-up on PA0
    
-   // Configure PB12, the GPIO pin with the red LED
-   GPIOB->MODER |= GPIO_MODER_MODER12_0;     // Configure PB12 as output for the red LED
+   // Configure PB12, the GPIO pin with the scope
+   GPIOB->MODER |= GPIO_MODER_MODER12_0;     // Configure PB12 as output for scope trigger or sync
    
    // Configure PB13, the GPIO pin with the green LED
    GPIOB->MODER |= GPIO_MODER_MODER13_0;     // Configure PB13 as output for the green LED

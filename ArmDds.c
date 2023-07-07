@@ -133,6 +133,7 @@ struct UART_BUFFER U1Buf;
 // The colour frame buffer, 32k bytes
 uint16_t Frame[MAXY][MAXX];
 
+uint32_t SavedRccCsr = 0u;
 volatile uint32_t Milliseconds = 0;
 volatile uint8_t Tick = 0;
 volatile uint16_t PhaseAcc = 0u;
@@ -1123,6 +1124,14 @@ uint16_t analogRead(const int channel)
 }
 
 
+/* nudgeWatchdog --- reset the watchdog counter */
+
+void nudgeWatchdog(void)
+{
+   IWDG->KR = (uint16_t)0xAAAA;
+}
+
+
 /* initMCU --- set up the microcontroller in general */
 
 static void initMCU(void)
@@ -1186,6 +1195,7 @@ static void initMCU(void)
    while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL)
       ;
    
+   SavedRccCsr = RCC->CSR;
    RCC->CSR |= RCC_CSR_RMVF;
 }
 
@@ -1399,6 +1409,18 @@ static void initMillisecondTimer(void)
 }
 
 
+/* initWatchdog --- set up the watchdog timer */
+
+static void initWatchdog(void)
+{
+   IWDG->KR = (uint16_t)0x5555;
+   IWDG->PR = IWDG_PR_PR_2;      // Prescaler divide-by-64 gives 8 seconds
+   IWDG->KR = (uint16_t)0xAAAA;
+   
+   IWDG->KR = (uint16_t)0xCCCC;  // Start the watchdog
+}
+
+
 int main(void)
 {
    uint32_t end;
@@ -1427,6 +1449,7 @@ int main(void)
    initADC();
    initTimers();
    initMillisecondTimer();
+   initWatchdog();
    
    dac_a(0);
    dac_b(0);
@@ -1440,6 +1463,9 @@ int main(void)
    updscreen(0, MAXY - 1);
    
    printf("\nHello from the STM%dF%d\n", 32, 411);
+   
+   if (SavedRccCsr & RCC_CSR_IWDGRSTF)
+      printf("Watchdog RESET\n");
    
    // Generate 12-bit sinewave
    for (i = 0; i < 256; i++) {
@@ -1507,6 +1533,7 @@ int main(void)
             updscreen(32, 63);
          }
          
+         nudgeWatchdog();
          Tick = 0;
       }
       

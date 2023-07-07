@@ -17,7 +17,7 @@ development board.
 The main reason for this choice of chip is that I have dev boards
 for those chips that I can use for testing.
 Also, the STM32F411 has a hardware floating-point unit (FPU) which may
-prove to be usefule for these programs.
+prove to be useful for these programs.
 
 ## ARM Toolchain
 
@@ -82,5 +82,4 @@ This may change to become voltage-controlled in a future version.
 * Store waveforms in Flash memory
 * Add more control voltage (CV) analog inputs
 * Test with other ARM chips (e.g. STM32F103 on Blue Pill)
-* Configure and test the watchdog timer
 

@@ -129,6 +129,7 @@ enum STATE {
 
 // UART buffers
 struct UART_BUFFER U1Buf;
+struct UART_BUFFER U6Buf;
 
 // The colour frame buffer, 32k bytes
 uint16_t Frame[MAXY][MAXX];
@@ -175,6 +176,42 @@ void USART1_IRQHandler(void)
       else
       {
          USART1->CR1 &= ~USART_CR1_TXEIE; // Nothing left to send; disable Tx Empty interrupt
+      }
+   }
+}
+
+
+/* USART6_IRQHandler --- ISR for USART6, used for Rx and Tx */
+
+void USART6_IRQHandler(void)
+{
+   if (USART6->SR & USART_SR_RXNE) {
+      const uint8_t tmphead = (U6Buf.rx.head + 1) & UART_RX_BUFFER_MASK;
+      const uint8_t ch = USART6->DR;  // Read received byte from UART
+      
+      if (tmphead == U6Buf.rx.tail)   // Is receive buffer full?
+      {
+          // Buffer is full; discard new byte
+      }
+      else
+      {
+         U6Buf.rx.head = tmphead;
+         U6Buf.rx.buf[tmphead] = ch;   // Store byte in buffer
+      }
+   }
+   
+   if (USART6->SR & USART_SR_TXE) {
+      if (U6Buf.tx.head != U6Buf.tx.tail) // Is there anything to send?
+      {
+         const uint8_t tmptail = (U6Buf.tx.tail + 1) & UART_TX_BUFFER_MASK;
+         
+         U6Buf.tx.tail = tmptail;
+
+         USART6->DR = U6Buf.tx.buf[tmptail];    // Transmit one byte
+      }
+      else
+      {
+         USART6->CR1 &= ~USART_CR1_TXEIE; // Nothing left to send; disable Tx Empty interrupt
       }
    }
 }
@@ -279,6 +316,29 @@ void UART1TxByte(const uint8_t data)
    U1Buf.tx.head = tmphead;
 
    USART1->CR1 |= USART_CR1_TXEIE;   // Enable UART1 Tx Empty interrupt
+}
+
+
+/* UART6RxByte --- read one character from UART6 via the circular buffer */
+
+uint8_t UART6RxByte(void)
+{
+   const uint8_t tmptail = (U6Buf.rx.tail + 1) & UART_RX_BUFFER_MASK;
+   
+   while (U6Buf.rx.head == U6Buf.rx.tail)  // Wait, if buffer is empty
+       ;
+   
+   U6Buf.rx.tail = tmptail;
+   
+   return (U6Buf.rx.buf[tmptail]);
+}
+
+
+/* UART6RxAvailable --- return true if a byte is available in UART6 circular buffer */
+
+int UART6RxAvailable(void)
+{
+   return (U6Buf.rx.head != U6Buf.rx.tail);
 }
 
 
@@ -1235,6 +1295,7 @@ static void initUARTs(void)
 {
    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;        // Enable clock to GPIO A peripherals on AHB1 bus
    RCC->APB2ENR |= RCC_APB2ENR_USART1EN;       // Enable USART1 clock
+   RCC->APB2ENR |= RCC_APB2ENR_USART6EN;       // Enable USART6 clock
    
    // Set up UART1 and associated circular buffers
    U1Buf.tx.head = 0;
@@ -1242,11 +1303,11 @@ static void initUARTs(void)
    U1Buf.rx.head = 0;
    U1Buf.rx.tail = 0;
    
-   // Configure PA9, the GPIO pin with alternative function TxD2
+   // Configure PA9, the GPIO pin with alternative function TxD1
    GPIOA->MODER |= GPIO_MODER_MODER9_1;        // PA9 in Alternative Function mode
    GPIOA->AFR[1] |= 7 << 4;                    // Configure PA9 as alternate function, AF7, UART1
   
-   // Configure PA10, the GPIO pin with alternative function RxD2
+   // Configure PA10, the GPIO pin with alternative function RxD1
    GPIOA->MODER |= GPIO_MODER_MODER10_1;       // PA10 in Alternative Function mode
    GPIOA->AFR[1] |= 7 << 8;                    // Configure PA10 as alternate function, AF7, UART1
    
@@ -1258,6 +1319,29 @@ static void initUARTs(void)
    USART1->CR1 |= USART_CR1_RE;           // Enable receiver
    
    NVIC_EnableIRQ(USART1_IRQn);
+   
+   // Set up UART6 and associated circular buffers
+   U6Buf.tx.head = 0;
+   U6Buf.tx.tail = 0;
+   U6Buf.rx.head = 0;
+   U6Buf.rx.tail = 0;
+   
+   // Configure PA11, the GPIO pin with alternative function TxD6
+   GPIOA->MODER |= GPIO_MODER_MODER11_1;       // PA11 in Alternative Function mode
+   GPIOA->AFR[1] |= 8 << 12;                   // Configure PA11 as alternate function, AF8, UART6
+   
+   // Configure PA12, the GPIO pin with alternative function RxD6
+   GPIOA->MODER |= GPIO_MODER_MODER12_1;       // PA12 in Alternative Function mode
+   GPIOA->AFR[1] |= 8 << 16;                   // Configure PA12 as alternate function, AF8, UART6
+   
+// Configure UART6 - defaults are 1 start bit, 8 data bits, 1 stop bit, no parity
+   USART6->CR1 |= USART_CR1_UE;           // Switch on the UART
+   USART6->BRR |= (200<<4) | 0;           // Set for 31250 baud (reference manual page 518) 100000000 / (16 * 31250)
+   USART6->CR1 |= USART_CR1_RXNEIE;       // Enable Rx Not Empty interrupt
+   USART6->CR1 |= USART_CR1_TE;           // Enable transmitter (sends a junk character)
+   USART6->CR1 |= USART_CR1_RE;           // Enable receiver
+   
+   NVIC_EnableIRQ(USART6_IRQn);
 }
 
 
@@ -1438,6 +1522,10 @@ int main(void)
    uint8_t note = 0u;
    uint8_t octave = 0u;
    const char *name = NULL;
+   uint8_t midiStatus = 0u;
+   uint8_t midiNoteNumber = 0u;
+   uint8_t midiVelocity = 0u;
+   uint8_t midiByte = 0u;
    int i;
    const double delta = (2.0 * M_PI) / 256.0;
    
@@ -1502,7 +1590,7 @@ int main(void)
             state++;
             break;
          case 3:
-            PhaseInc = IncTab[midi];
+            //PhaseInc = IncTab[midi];
             state = 0;
             break;
          }
@@ -1705,6 +1793,44 @@ int main(void)
             memset(Frame, 0, sizeof (Frame));
             updscreen(0, MAXY - 1);
             break;
+         }
+      }
+      
+      if (UART6RxAvailable()) {
+         const uint8_t ch = UART6RxByte();
+         
+         //printf("UART6: %02x\n", ch);
+         
+         if (ch & 0x80) {
+            midiStatus = ch;
+            midiByte = 1;
+         }
+         else {
+            switch (midiByte) {
+            case 1:
+               if (midiStatus == 0x90) {
+                  midiNoteNumber = ch;
+                  midiByte++;
+               }
+               break;
+            case 2:
+               if (midiStatus == 0x90) {
+                  midiVelocity = ch;
+                  midiByte = 1;
+                  octave = (midi / 12) - 1;
+            note = midi % 12;
+            name = NoteNames[note];
+                  if (midiVelocity == 0) {
+                     printf("MIDI: NOTE OFF %d\n", midiNoteNumber);
+                     PhaseInc = 0;
+                  }
+                  else {
+                     printf("MIDI: NOTE ON %d %s%d %d\n", midiNoteNumber, NoteNames[midiNoteNumber % 12], (midiNoteNumber / 12) - 1, midiVelocity);
+                     PhaseInc = IncTab[midiNoteNumber];
+                  }
+               }
+               break;
+            }
          }
       }
    }

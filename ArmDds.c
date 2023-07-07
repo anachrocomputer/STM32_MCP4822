@@ -1817,9 +1817,7 @@ int main(void)
                if (midiStatus == 0x90) {
                   midiVelocity = ch;
                   midiByte = 1;
-                  octave = (midi / 12) - 1;
-            note = midi % 12;
-            name = NoteNames[note];
+                  
                   if (midiVelocity == 0) {
                      printf("MIDI: NOTE OFF %d\n", midiNoteNumber);
                      PhaseInc = 0;

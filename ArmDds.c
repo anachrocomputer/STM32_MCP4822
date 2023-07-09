@@ -1613,12 +1613,12 @@ int main(void)
          if (millis() >= frame) {
             frame = millis() + 40u;
             
-            const uint16_t ana1 = analogRead(1) / 32;
-            const uint16_t ana2 = analogRead(8) / 32;
-            fillRect(0, 32, 127, 63, SSD1351_WHITE, SSD1351_BLACK);
-            fillRect(1, 33, ana1, 47, SSD1351_BLUE, SSD1351_BLUE);
-            fillRect(1, 48, ana2, 62, SSD1351_BLUE, SSD1351_BLUE);
-            updscreen(32, 63);
+            //const uint16_t ana1 = analogRead(1) / 32;
+            //const uint16_t ana2 = analogRead(8) / 32;
+            //fillRect(0, 32, 127, 63, SSD1351_WHITE, SSD1351_BLACK);
+            //fillRect(1, 33, ana1, 47, SSD1351_BLUE, SSD1351_BLUE);
+            //fillRect(1, 48, ana2, 62, SSD1351_BLUE, SSD1351_BLUE);
+            //updscreen(32, 63);
          }
          
          nudgeWatchdog();
@@ -1825,6 +1825,9 @@ int main(void)
                   else {
                      printf("MIDI: NOTE ON %d %s%d %d\n", midiNoteNumber, NoteNames[midiNoteNumber % 12], (midiNoteNumber / 12) - 1, midiVelocity);
                      PhaseInc = IncTab[midiNoteNumber];
+                     fillRect(0, 47, 127, 63, SSD1351_WHITE, SSD1351_BLACK);
+                     fillRect(1, 48, (midiNoteNumber - 32) * 2, 62, SSD1351_BLUE, SSD1351_BLUE);
+                     updscreen(47, 63);
                   }
                }
                break;

@@ -137,6 +137,8 @@ uint16_t Frame[MAXY][MAXX];
 uint32_t SavedRccCsr = 0u;
 volatile uint32_t Milliseconds = 0;
 volatile uint8_t Tick = 0;
+volatile uint8_t DacSpiState = 0u;
+volatile uint16_t DacB = 0xb000;
 volatile uint16_t PhaseAcc = 0u;
 volatile uint16_t PhaseInc = 512u;
 volatile uint16_t Wave[256];
@@ -223,9 +225,18 @@ void SPI2_IRQHandler(void)
 {
    volatile uint16_t junk __attribute((unused));
    
+   GPIOA->BSRR = GPIO_BSRR_BS8; // GPIO pin PA8 HIGH: DAC chip de-select
+   
    junk = SPI2->DR;
    
-   GPIOA->BSRR = GPIO_BSRR_BS8; // GPIO pin PA8 HIGH: DAC chip de-select
+   if (DacSpiState == 1) { // Another DAC word to send?
+      GPIOA->BSRR = GPIO_BSRR_BR8; // GPIO pin PA8 LOW: DAC chip select
+      SPI2->DR = DacB;     // Start second SPI transmission to DAC
+      DacSpiState++;
+   }
+   else {
+      DacSpiState = 0;     // All done, ready for next timer interrupt
+   }
 }
 
 
@@ -233,13 +244,11 @@ void SPI2_IRQHandler(void)
 
 void TIM4_IRQHandler(void)
 {
-   volatile uint16_t junk __attribute((unused));
-   
    TIM4->SR &= ~TIM_SR_UIF;   // Clear timer interrupt flag
    
    PhaseAcc += PhaseInc;
    const uint16_t sample = Wave[PhaseAcc >> 8u];
-   const uint16_t dac = 0x3000 | (sample & 0x0fff);
+   const uint16_t dacA = 0x3000 | (sample & 0x0fff);
    
    // Square wave on PB12 for scope sync
    if (PhaseAcc & 0x8000)
@@ -249,7 +258,8 @@ void TIM4_IRQHandler(void)
    
    GPIOA->BSRR = GPIO_BSRR_BR8; // GPIO pin PA8 LOW: DAC chip select
    
-   SPI2->DR = dac;   // Start SPI transmission to DAC
+   SPI2->DR = dacA;  // Start SPI transmission to DAC
+   DacSpiState++;    // First DAC word sent, ready for SPI interrupt to fire
 }
 
 
@@ -1440,7 +1450,7 @@ static void initSPI2(void)
    SPI2->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_MSTR;
    SPI2->CR1 |= SPI_CR1_CPOL | SPI_CR1_CPHA;
    SPI2->CR1 |= SPI_CR1_DFF;  // 16-bit mode for just a bit more speed
-   SPI2->CR1 |= SPI_CR1_BR_2; // 50MHz divide-by-32 gives 1.5625MHz
+   SPI2->CR1 |= SPI_CR1_BR_1 | SPI_CR1_BR_0; // 50MHz divide-by-16 gives 3.125MHz
    SPI2->CR2 |= SPI_CR2_RXNEIE;  // Enable interrupt on Rx non-empty
    SPI2->CR1 |= SPI_CR1_SPE;  // Enable SPI
    
@@ -1825,6 +1835,7 @@ int main(void)
                   else {
                      printf("MIDI: NOTE ON %d %s%d %d\n", midiNoteNumber, NoteNames[midiNoteNumber % 12], (midiNoteNumber / 12) - 1, midiVelocity);
                      PhaseInc = IncTab[midiNoteNumber];
+                     DacB = 0xb000 | (((midiNoteNumber - 32) * 64) & 0x0fff);
                      fillRect(0, 47, 127, 63, SSD1351_WHITE, SSD1351_BLACK);
                      fillRect(1, 48, (midiNoteNumber - 32) * 2, 62, SSD1351_BLUE, SSD1351_BLUE);
                      updscreen(47, 63);

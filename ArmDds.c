@@ -1285,11 +1285,11 @@ static void initGPIOs(void)
    // Configure PB12, the GPIO pin with the scope
    GPIOB->MODER |= GPIO_MODER_MODER12_0;     // Configure PB12 as output for scope trigger or sync
    
-   // Configure PB13, the GPIO pin with the green LED
-   GPIOB->MODER |= GPIO_MODER_MODER13_0;     // Configure PB13 as output for the green LED
+   // Configure PB13, the GPIO pin with the GATE
+   GPIOB->MODER |= GPIO_MODER_MODER13_0;     // Configure PB13 as output for the GATE signal
    
-   // Configure PB14, the GPIO pin with the blue LED
-   GPIOB->MODER |= GPIO_MODER_MODER14_0;     // Configure PB14 as output for the blue LED
+   // Configure PB14, the GPIO pin with the TRIGGER
+   GPIOB->MODER |= GPIO_MODER_MODER14_0;     // Configure PB14 as output for the TRIGGER signal
    
    // Configure PC13, the GPIO pin with the on-board blue LED
    GPIOC->MODER |= GPIO_MODER_MODER13_0;     // Configure PC13 as output for the on-board LED
@@ -1519,6 +1519,7 @@ int main(void)
 {
    uint32_t end;
    uint32_t frame;
+   uint32_t triggerOff = 0xffffffff;
    uint8_t flag = 0;
    const int width = WD + 6;
    int digit = 0;
@@ -1629,6 +1630,11 @@ int main(void)
             //fillRect(1, 33, ana1, 47, SSD1351_BLUE, SSD1351_BLUE);
             //fillRect(1, 48, ana2, 62, SSD1351_BLUE, SSD1351_BLUE);
             //updscreen(32, 63);
+         }
+         
+         if (millis() >= triggerOff) {
+            GPIOB->BSRR = GPIO_BSRR_BR14; // GPIO pin PB14 LOW, TRIGGER off
+            triggerOff = 0xffffffff;
          }
          
          nudgeWatchdog();
@@ -1831,10 +1837,14 @@ int main(void)
                   if (midiVelocity == 0) {
                      printf("MIDI: NOTE OFF %d\n", midiNoteNumber);
                      PhaseInc = 0;
+                     GPIOB->BSRR = GPIO_BSRR_BR13; // GPIO pin PB13 LOW, GATE off
                   }
                   else {
                      printf("MIDI: NOTE ON %d %s%d %d\n", midiNoteNumber, NoteNames[midiNoteNumber % 12], (midiNoteNumber / 12) - 1, midiVelocity);
                      PhaseInc = IncTab[midiNoteNumber];
+                     GPIOB->BSRR = GPIO_BSRR_BS13; // GPIO pin PB13 HIGH, GATE on
+                     GPIOB->BSRR = GPIO_BSRR_BS14; // GPIO pin PB14 HIGH, TRIGGER on
+                     triggerOff = millis() + 10;
                      DacB = 0xb000 | (((midiNoteNumber - 32) * 64) & 0x0fff);
                      fillRect(0, 47, 127, 63, SSD1351_WHITE, SSD1351_BLACK);
                      fillRect(1, 48, (midiNoteNumber - 32) * 2, 62, SSD1351_BLUE, SSD1351_BLUE);

@@ -1536,6 +1536,11 @@ int main(void)
    uint8_t midiStatus = 0u;
    uint8_t midiNoteNumber = 0u;
    uint8_t midiVelocity = 0u;
+   uint8_t midiProgram = 0u;
+   uint8_t midiControl = 0u;
+   uint8_t midiValue = 0u;
+   uint8_t midiBendLo = 0u;
+   uint8_t midiBendHi = 0u;
    uint8_t midiByte = 0u;
    int i;
    const double delta = (2.0 * M_PI) / 256.0;
@@ -1828,6 +1833,20 @@ int main(void)
                   midiNoteNumber = ch;
                   midiByte++;
                }
+               else if (midiStatus == 0xC0) {
+                  midiProgram = ch;
+                  midiByte = 1;
+                  
+                  printf("MIDI: PROGRAM CHANGE %d\n", midiProgram);
+               }
+               else if (midiStatus == 0xB0) {
+                  midiControl = ch;
+                  midiByte++;
+               }
+               else if (midiStatus == 0xE0) {
+                  midiBendLo = ch;
+                  midiByte++;
+               }
                break;
             case 2:
                if (midiStatus == 0x90) {
@@ -1850,6 +1869,18 @@ int main(void)
                      fillRect(1, 48, (midiNoteNumber - 32) * 2, 62, SSD1351_BLUE, SSD1351_BLUE);
                      updscreen(47, 63);
                   }
+               }
+               else if (midiStatus == 0xB0) {
+                  midiValue = ch;
+                  midiByte = 1;
+                  
+                  printf("MIDI: CONTROL %d CHANGE %d\n", midiControl, midiValue);
+               }
+               else if (midiStatus == 0xE0) {
+                  midiBendHi = ch;
+                  midiByte = 1;
+                  
+                  printf("MIDI: PITCH BEND %d\n", (midiBendHi * 127) + midiBendLo);
                }
                break;
             }

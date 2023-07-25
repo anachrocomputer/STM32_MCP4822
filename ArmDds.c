@@ -8,6 +8,32 @@
 #include <ctype.h>
 #include <math.h>
 
+#define MIDI_NOTE_OFF           (0x80)
+#define MIDI_NOTE_ON            (0x90)
+#define MIDI_POLY_AFTERTOUCH    (0xA0)
+#define MIDI_CONTROL_CHANGE     (0xB0)
+#define MIDI_PROGRAM_CHANGE     (0xC0)
+#define MIDI_CHAN_AFTERTOUCH    (0xD0)
+#define MIDI_PITCH_BEND         (0xE0)
+#define MIDI_SYSTEM             (0xF0)
+
+#define MIDI_SYS_EX             (0x00)
+#define MIDI_TIME_CODE          (0x01)
+#define MIDI_SONG_POSITION      (0x02)
+#define MIDI_SONG_SELECT        (0x03)
+#define MIDI_RESERVED4          (0x04)
+#define MIDI_RESERVED5          (0x05)
+#define MIDI_TUNE_REQUEST       (0x06)
+#define MIDI_SYS_EX_END         (0x07)
+#define MIDI_TIMING_CLOCK       (0x08)
+#define MIDI_RESERVED9          (0x09)
+#define MIDI_START              (0x0A)
+#define MIDI_CONTINUE           (0x0B)
+#define MIDI_STOP               (0x0C)
+#define MIDI_RESERVED13         (0x0D)
+#define MIDI_ACTIVE_SENSING     (0x0E)
+#define MIDI_SYS_RESET          (0x0F)
+
 // Size of 128x128 OLED screen
 #define MAXX 128
 #define MAXY 128
@@ -1186,27 +1212,27 @@ void MidiRxByte(const uint8_t ch)
    else {
       switch (midiByte) {
       case 1:
-         if (midiStatus == 0x90) {
+         if (midiStatus == MIDI_NOTE_ON) {
             midiNoteNumber = ch;
             midiByte++;
          }
-         else if (midiStatus == 0xC0) {
+         else if (midiStatus == MIDI_PROGRAM_CHANGE) {
             midiProgram = ch;
             midiByte = 1;
             
             printf("MIDI: %d PROGRAM CHANGE %d\n", midiChannel, midiProgram);
          }
-         else if (midiStatus == 0xB0) {
+         else if (midiStatus == MIDI_CONTROL_CHANGE) {
             midiControl = ch;
             midiByte++;
          }
-         else if (midiStatus == 0xE0) {
+         else if (midiStatus == MIDI_PITCH_BEND) {
             midiBendLo = ch;
             midiByte++;
          }
          break;
       case 2:
-         if (midiStatus == 0x90) {
+         if (midiStatus == MIDI_NOTE_ON) {
             midiVelocity = ch;
             midiByte = 1;
             
@@ -1227,13 +1253,13 @@ void MidiRxByte(const uint8_t ch)
                updscreen(47, 63);
             }
          }
-         else if (midiStatus == 0xB0) {
+         else if (midiStatus == MIDI_CONTROL_CHANGE) {
             midiValue = ch;
             midiByte = 1;
             
             printf("MIDI: %d CONTROL %d CHANGE %d\n", midiChannel, midiControl, midiValue);
          }
-         else if (midiStatus == 0xE0) {
+         else if (midiStatus == MIDI_PITCH_BEND) {
             midiBendHi = ch;
             midiByte = 1;
             

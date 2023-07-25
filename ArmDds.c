@@ -137,6 +137,7 @@ uint16_t Frame[MAXY][MAXX];
 uint32_t SavedRccCsr = 0u;
 volatile uint32_t Milliseconds = 0;
 volatile uint8_t Tick = 0;
+uint32_t TriggerOff = 0xffffffff;
 volatile uint8_t DacSpiState = 0u;
 volatile uint16_t DacB = 0xb000;
 volatile uint16_t PhaseAcc = 0u;
@@ -1162,6 +1163,88 @@ void renderHexDigit(const int x, const int digit, const int style, const uint16_
 }
 
 
+/* midiRxByte --- state machine to deal with a single MIDI byte received from the UART */
+
+void MidiRxByte(const uint8_t ch)
+{
+   static uint8_t midiStatus = 0u;
+   static uint8_t midiChannel = 0u;
+   static uint8_t midiNoteNumber = 0u;
+   uint8_t midiVelocity = 0u;
+   uint8_t midiProgram = 0u;
+   static uint8_t midiControl = 0u;
+   uint8_t midiValue = 0u;
+   static uint8_t midiBendLo = 0u;
+   uint8_t midiBendHi = 0u;
+   static uint8_t midiByte = 0u;
+   
+   if (ch & 0x80) {
+      midiStatus = ch & 0xF0;
+      midiChannel = ch & 0x0F;
+      midiByte = 1;
+   }
+   else {
+      switch (midiByte) {
+      case 1:
+         if (midiStatus == 0x90) {
+            midiNoteNumber = ch;
+            midiByte++;
+         }
+         else if (midiStatus == 0xC0) {
+            midiProgram = ch;
+            midiByte = 1;
+            
+            printf("MIDI: %d PROGRAM CHANGE %d\n", midiChannel, midiProgram);
+         }
+         else if (midiStatus == 0xB0) {
+            midiControl = ch;
+            midiByte++;
+         }
+         else if (midiStatus == 0xE0) {
+            midiBendLo = ch;
+            midiByte++;
+         }
+         break;
+      case 2:
+         if (midiStatus == 0x90) {
+            midiVelocity = ch;
+            midiByte = 1;
+            
+            if (midiVelocity == 0) {
+               printf("MIDI: %d NOTE OFF %d\n", midiChannel, midiNoteNumber);
+               PhaseInc = 0;
+               GPIOB->BSRR = GPIO_BSRR_BR13; // GPIO pin PB13 LOW, GATE off
+            }
+            else {
+               printf("MIDI: %d NOTE ON %d %s%d %d\n", midiChannel, midiNoteNumber, NoteNames[midiNoteNumber % 12], (midiNoteNumber / 12) - 1, midiVelocity);
+               PhaseInc = IncTab[midiNoteNumber];
+               GPIOB->BSRR = GPIO_BSRR_BS13; // GPIO pin PB13 HIGH, GATE on
+               GPIOB->BSRR = GPIO_BSRR_BS14; // GPIO pin PB14 HIGH, TRIGGER on
+               TriggerOff = millis() + 10;
+               DacB = 0xb000 | (((midiNoteNumber - 32) * 64) & 0x0fff);
+               fillRect(0, 47, 127, 63, SSD1351_WHITE, SSD1351_BLACK);
+               fillRect(1, 48, (midiNoteNumber - 32) * 2, 62, SSD1351_BLUE, SSD1351_BLUE);
+               updscreen(47, 63);
+            }
+         }
+         else if (midiStatus == 0xB0) {
+            midiValue = ch;
+            midiByte = 1;
+            
+            printf("MIDI: %d CONTROL %d CHANGE %d\n", midiChannel, midiControl, midiValue);
+         }
+         else if (midiStatus == 0xE0) {
+            midiBendHi = ch;
+            midiByte = 1;
+            
+            printf("MIDI: %d PITCH BEND %d\n", midiChannel, (midiBendHi * 127) + midiBendLo);
+         }
+         break;
+      }
+   }
+}
+
+
 /* _write --- connect stdio functions to UART1 */
 
 int _write(const int fd, const char *ptr, const int len)
@@ -1519,7 +1602,6 @@ int main(void)
 {
    uint32_t end;
    uint32_t frame;
-   uint32_t triggerOff = 0xffffffff;
    uint8_t flag = 0;
    const int width = WD + 6;
    int digit = 0;
@@ -1533,15 +1615,6 @@ int main(void)
    uint8_t note = 0u;
    uint8_t octave = 0u;
    const char *name = NULL;
-   uint8_t midiStatus = 0u;
-   uint8_t midiNoteNumber = 0u;
-   uint8_t midiVelocity = 0u;
-   uint8_t midiProgram = 0u;
-   uint8_t midiControl = 0u;
-   uint8_t midiValue = 0u;
-   uint8_t midiBendLo = 0u;
-   uint8_t midiBendHi = 0u;
-   uint8_t midiByte = 0u;
    int i;
    const double delta = (2.0 * M_PI) / 256.0;
    
@@ -1637,9 +1710,9 @@ int main(void)
             //updscreen(32, 63);
          }
          
-         if (millis() >= triggerOff) {
+         if (millis() >= TriggerOff) {
             GPIOB->BSRR = GPIO_BSRR_BR14; // GPIO pin PB14 LOW, TRIGGER off
-            triggerOff = 0xffffffff;
+            TriggerOff = 0xffffffff;
          }
          
          nudgeWatchdog();
@@ -1822,69 +1895,7 @@ int main(void)
          
          //printf("UART6: %02x\n", ch);
          
-         if (ch & 0x80) {
-            midiStatus = ch;
-            midiByte = 1;
-         }
-         else {
-            switch (midiByte) {
-            case 1:
-               if (midiStatus == 0x90) {
-                  midiNoteNumber = ch;
-                  midiByte++;
-               }
-               else if (midiStatus == 0xC0) {
-                  midiProgram = ch;
-                  midiByte = 1;
-                  
-                  printf("MIDI: PROGRAM CHANGE %d\n", midiProgram);
-               }
-               else if (midiStatus == 0xB0) {
-                  midiControl = ch;
-                  midiByte++;
-               }
-               else if (midiStatus == 0xE0) {
-                  midiBendLo = ch;
-                  midiByte++;
-               }
-               break;
-            case 2:
-               if (midiStatus == 0x90) {
-                  midiVelocity = ch;
-                  midiByte = 1;
-                  
-                  if (midiVelocity == 0) {
-                     printf("MIDI: NOTE OFF %d\n", midiNoteNumber);
-                     PhaseInc = 0;
-                     GPIOB->BSRR = GPIO_BSRR_BR13; // GPIO pin PB13 LOW, GATE off
-                  }
-                  else {
-                     printf("MIDI: NOTE ON %d %s%d %d\n", midiNoteNumber, NoteNames[midiNoteNumber % 12], (midiNoteNumber / 12) - 1, midiVelocity);
-                     PhaseInc = IncTab[midiNoteNumber];
-                     GPIOB->BSRR = GPIO_BSRR_BS13; // GPIO pin PB13 HIGH, GATE on
-                     GPIOB->BSRR = GPIO_BSRR_BS14; // GPIO pin PB14 HIGH, TRIGGER on
-                     triggerOff = millis() + 10;
-                     DacB = 0xb000 | (((midiNoteNumber - 32) * 64) & 0x0fff);
-                     fillRect(0, 47, 127, 63, SSD1351_WHITE, SSD1351_BLACK);
-                     fillRect(1, 48, (midiNoteNumber - 32) * 2, 62, SSD1351_BLUE, SSD1351_BLUE);
-                     updscreen(47, 63);
-                  }
-               }
-               else if (midiStatus == 0xB0) {
-                  midiValue = ch;
-                  midiByte = 1;
-                  
-                  printf("MIDI: CONTROL %d CHANGE %d\n", midiControl, midiValue);
-               }
-               else if (midiStatus == 0xE0) {
-                  midiBendHi = ch;
-                  midiByte = 1;
-                  
-                  printf("MIDI: PITCH BEND %d\n", (midiBendHi * 127) + midiBendLo);
-               }
-               break;
-            }
-         }
+         MidiRxByte(ch);
       }
    }
 }

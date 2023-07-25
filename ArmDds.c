@@ -1206,7 +1206,7 @@ void MidiRxByte(const uint8_t ch)
    
    if (ch & 0x80) {
       midiStatus = ch & 0xF0;
-      midiChannel = ch & 0x0F;
+      midiChannel = (ch & 0x0F) + 1;
       midiByte = 1;
    }
    else {
@@ -1263,7 +1263,7 @@ void MidiRxByte(const uint8_t ch)
             midiBendHi = ch;
             midiByte = 1;
             
-            printf("MIDI: %d PITCH BEND %d\n", midiChannel, (midiBendHi * 127) + midiBendLo);
+            printf("MIDI: %d PITCH BEND %d\n", midiChannel, (midiBendHi * 128) + midiBendLo);
          }
          break;
       }

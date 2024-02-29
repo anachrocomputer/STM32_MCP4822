@@ -135,23 +135,6 @@ enum STYLE {
    VFD_STYLE
 };
 
-// What mode should the display operate in?
-enum MODE {
-   MANUAL_MODE,
-   AUTO_HMS_MODE,
-   AUTO_HEX_MODE
-};
-
-// What state is the command parser operating in?
-enum STATE {
-   NOT_SETTING_TIME,
-   SETTING_TIME_1,
-   SETTING_TIME_2,
-   SETTING_TIME_3,
-   SETTING_TIME_4,
-   SETTING_TIME_5,
-   SETTING_TIME_6
-};
 
 // UART buffers
 struct UART_BUFFER U1Buf;
@@ -520,7 +503,6 @@ static void oledCmd3b(const uint8_t c, const uint8_t b1, const uint8_t b2, const
    spi_txd(b3);
    spi_cs(1);
 }
-
 
 
 /* updscreen --- update the physical screen from the buffer */

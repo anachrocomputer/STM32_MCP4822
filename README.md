@@ -1,4 +1,7 @@
-# STM32_MCP4822
+![Static Badge](https://img.shields.io/badge/MCU-STM32-green "MCU:STM32")
+![Static Badge](https://img.shields.io/badge/DAC-MCP4822-green "DAC:MCP4822")
+
+# STM32_MCP4822 #
 
 Some simple STM32 programs to explore analog output via the Microchip
 MCP4822 dual 12-bit DAC.
@@ -10,7 +13,7 @@ into STM32 chips for testing purposes.
 
 The 'Makefile' also has targets for the STM32 programming tool 'stlink'.
 
-## Chips Supported
+## Chips Supported ##
 
 At present, there's only support for the STM32F411 on the Black Pill
 development board.
@@ -19,7 +22,7 @@ for those chips that I can use for testing.
 Also, the STM32F411 has a hardware floating-point unit (FPU) which may
 prove to be useful for these programs.
 
-## ARM Toolchain
+## ARM Toolchain ##
 
 The programs have been compiled, linked and tested using a Linux version
 of the 'arm-none-eabi-gcc' toolchain.
@@ -39,11 +42,11 @@ There's a Makefile target called 'clean' that deletes the object code files
 and the ELF and BIN binary files.
 It leaves the source code files untouched, of course.
 
-## STM32 Programmers
+## STM32 Programmers ##
 
 I have tested the code with an 'ST-LINK V2' programmer.
 
-## Test Setup
+## Test Setup ##
 
 Blinking LEDs, of course!
 The LED should blink at 1Hz (500ms on, 500ms off).
@@ -73,7 +76,7 @@ To select different waveforms, the chips accept 's' for a sinewave,
 'q' for a squarewave, 't' for a triangle wave, and 'w' for a sawtooth.
 This may change to become voltage-controlled in a future version.
 
-## Future Enhancements
+## Future Enhancements ##
 
 * Implement external op-amp connected to MCP4822
 * Implement active low-pass filter on MCP4822 output
